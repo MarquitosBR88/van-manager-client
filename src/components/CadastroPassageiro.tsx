@@ -24,6 +24,7 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
   const [turno, setTurno] = useState(
     alunoEditando ? alunoEditando.turno : "MANHA",
   );
+  const [ordemRota, setOrdemRota] = useState(alunoEditando?.ordemRota || "");
 
   function salvarPassageiro() {
     const dadosPassageiro = {
@@ -33,6 +34,7 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
       bairro,
       faculdade,
       turno,
+      ordemRota: Number(ordemRota),
     };
     if (alunoEditando) {
       axios
@@ -118,6 +120,19 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
             value={faculdade}
             onChange={(e) => setFaculdade(e.target.value)}
           ></input>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Ordem no Roteiro (Posição)
+          </label>
+          <input
+            type="number"
+            placeholder="Ex: 1 (Primeiro a ser buscado)"
+            className="w-full p-2 rounded-lg border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+            value={ordemRota}
+            onChange={(e) => setOrdemRota(e.target.value)}
+          />
         </div>
 
         <div>

@@ -6,4 +6,5 @@ export interface Student {
   bairro: string;
   faculdade: string;
   turno: string;
+  ordemRota?: number;
 }

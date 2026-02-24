@@ -17,6 +17,7 @@ function Home() {
       .trim();
 
   function preencherLista() {
+    // ATENÇÃO AMANHÃ NA VAN: Lembre de trocar o localhost:8080 pelo link do seu ngrok do Java aqui!
     axios
       .get(`http://localhost:8080/students`)
       .then((resposta) => {
@@ -28,18 +29,13 @@ function Home() {
   }
 
   function processarLista() {
-    // Trava de segurança: se estiver vazio, nem começa
     if (!textoWhatsapp.trim()) return;
-
-    console.log("1. O motorista colou isso:\n", textoWhatsapp);
-    console.log("2. Alunos que o Axios puxou do banco:", alunosBanco);
 
     const currentRoute: any[] = [];
     const currentUnknown: string[] = [];
     const currentReturn: string[] = [];
     const processedIds = new Set<number>();
 
-    // Corta o texto a cada "Enter" ou vírgula
     const lines = textoWhatsapp.split(/[\n,]/);
 
     lines.forEach((line) => {
@@ -51,17 +47,69 @@ function Home() {
         normalizedLine.includes("so volta") ||
         normalizedLine.includes("so retorno");
 
-      // Tenta achar no banco (Com trava anti-erro caso o nome seja nulo no Java)
-      let matchedStudent = alunosBanco.find((aluno) => {
-        if (!aluno.nome) return false; // Se o cara não tem nome salvo, ignora
+      const parenthesesMatch = cleanLine.match(/\(([^)]+)\)/);
+      let isAttention = false;
+
+      if (parenthesesMatch) {
+        const contentInside = normalize(parenthesesMatch[1]);
+        if (
+          !contentInside.includes("uniube") &&
+          !contentInside.includes("so volta") &&
+          !contentInside.includes("so retorno")
+        ) {
+          isAttention = true;
+        }
+      }
+
+      // Se requer atenção (tem parênteses estranhos), vai pra lista de baixo para análise manual
+      if (isAttention) {
+        currentUnknown.push(cleanLine);
+        return;
+      }
+
+      // 1. Acha TODOS os candidatos que combinam
+      let candidatos = alunosBanco.filter((aluno) => {
+        if (!aluno.nome) return false;
+        const nDb = normalize(aluno.nome);
         return (
-          normalize(aluno.nome).includes(normalizedLine) ||
-          normalizedLine.includes(normalize(aluno.nome))
+          nDb === normalizedLine ||
+          nDb.includes(normalizedLine) ||
+          normalizedLine.includes(nDb)
         );
       });
 
+      let matchedStudent = undefined;
+
+      if (candidatos.length > 0) {
+        // 2. O Desempate: quem é o aluno certo?
+        candidatos.sort((a, b) => {
+          const nA = normalize(a.nome);
+          const nB = normalize(b.nome);
+
+          // Regra 1: Match 100% perfeito ganha de todo mundo
+          if (nA === normalizedLine) return -1;
+          if (nB === normalizedLine) return 1;
+
+          // Regra 2: O cara colou "Maria Eduarda Silva (so volta)"
+          // Se achou as duas Marias dentro do texto, a MAIOR (que engloba o Silva) tem prioridade
+          const aEstaNaLinha = normalizedLine.includes(nA);
+          const bEstaNaLinha = normalizedLine.includes(nB);
+
+          if (aEstaNaLinha && bEstaNaLinha) return nB.length - nA.length;
+          if (aEstaNaLinha) return -1;
+          if (bEstaNaLinha) return 1;
+
+          // Regra 3: O cara colou só "Maria Eduarda"
+          // O banco achou as duas. A MENOR tem prioridade, pra Silva não entrar no lugar dela.
+          return nA.length - nB.length;
+        });
+
+        // O verdadeiro campeão senta na cadeira
+        matchedStudent = candidatos[0];
+      }
+
       if (matchedStudent) {
-        if (processedIds.has(matchedStudent.id)) return; // Evita duplicados
+        if (processedIds.has(matchedStudent.id)) return;
 
         if (isReturnOnly) {
           currentReturn.push(
@@ -72,8 +120,8 @@ function Home() {
             id: matchedStudent.id,
             nome: matchedStudent.nome,
             faculdade: matchedStudent.faculdade,
-            // Como defaultOrder ainda não existe no Java, mandamos 0 provisoriamente
-            originalIndex: 0,
+            originalIndex: matchedStudent.ordemRota,
+            embarcou: false, // <-- Adicionado para o Check-in não falhar
           });
           processedIds.add(matchedStudent.id);
         }
@@ -84,17 +132,61 @@ function Home() {
           currentUnknown.push(cleanLine);
         }
       }
-    }); // <-- Aqui acaba o forEach
+    });
 
-    // Salva nos estados do React
+    currentRoute.sort((a, b) => {
+      const ordemA = a.originalIndex || 999;
+      const ordemB = b.originalIndex || 999;
+      return ordemA - ordemB;
+    });
+
     setRouteList(currentRoute);
     setUnknownList(currentUnknown);
     setReturnOnlyList(currentReturn);
-
-    // Os radares finais que vão nos contar o final da história
-    console.log("3. Encontrados na base:", currentRoute);
-    console.log("4. Não identificados:", currentUnknown);
   }
+
+  const removeFromRoute = (index: number) => {
+    setRouteList((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const moveItem = (index: number, direction: "up" | "down") => {
+    const newList = [...routeList];
+    if (direction === "up" && index > 0) {
+      [newList[index - 1], newList[index]] = [
+        newList[index],
+        newList[index - 1],
+      ];
+    } else if (direction === "down" && index < newList.length - 1) {
+      [newList[index + 1], newList[index]] = [
+        newList[index],
+        newList[index + 1],
+      ];
+    }
+    setRouteList(newList);
+  };
+
+  const toggleEmbarque = (index: number) => {
+    const newList = [...routeList];
+    newList[index].embarcou = !newList[index].embarcou;
+    setRouteList(newList);
+  };
+
+  const removeUnknown = (index: number) => {
+    setUnknownList((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const promoteToRoute = (index: number) => {
+    const rawName = unknownList[index];
+    const tempItem = {
+      id: `temp-${Date.now()}`,
+      nome: rawName,
+      faculdade: "Adicionado Manualmente",
+      originalIndex: 999,
+      embarcou: false,
+    };
+    setUnknownList((prev) => prev.filter((_, i) => i !== index));
+    setRouteList((prev) => [...prev, tempItem]);
+  };
 
   useEffect(() => {
     preencherLista();
@@ -106,7 +198,6 @@ function Home() {
         Roteiro do Dia
       </h1>
 
-      {/* A Caixa de Cola do WhatsApp */}
       <div className="bg-white p-4 rounded-xl shadow-md">
         <label className="block text-sm font-bold text-gray-700 mb-2">
           Cole a lista do WhatsApp aqui:
@@ -120,19 +211,145 @@ function Home() {
 
         <button
           onClick={processarLista}
-          className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition"
+          className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition cursor-pointer"
         >
           Gerar Rota
         </button>
       </div>
 
-      {/* Aqui embaixo vão aparecer os Cards ordenados depois */}
-      <div>
-        <h2 className="font-bold text-gray-600 mb-3 border-b pb-2">
-          Passageiros de Hoje:
-        </h2>
-        {/* Vamos colocar o .map() aqui no próximo passo */}
-      </div>
+      {(routeList.length > 0 ||
+        unknownList.length > 0 ||
+        returnOnlyList.length > 0) && (
+        <div className="flex flex-col gap-4 mb-8">
+          {/* 1. LISTA PRINCIPAL */}
+          {routeList.length > 0 && (
+            <div>
+              <h2 className="font-bold text-gray-700 mb-3 border-b-2 border-blue-500 pb-1">
+                🚌 Rota Principal ({routeList.length})
+              </h2>
+              <div className="flex flex-col gap-2">
+                {routeList.map((item, index) => (
+                  <div
+                    key={item.id || index}
+                    className={`p-3 rounded-lg shadow border-l-4 flex justify-between items-center transition-colors duration-300 ${item.embarcou ? "bg-green-100 border-green-500 opacity-75" : "bg-white border-blue-500"}`}
+                  >
+                    <div
+                      className="flex items-center gap-3 flex-1 cursor-pointer"
+                      onClick={() => toggleEmbarque(index)}
+                    >
+                      <button
+                        className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-lg shadow-sm transition-colors ${item.embarcou ? "bg-green-500 text-white" : "bg-blue-100 text-blue-700"}`}
+                      >
+                        {item.embarcou ? "✓" : index + 1}
+                      </button>
+                      <div>
+                        <p
+                          className={`font-bold text-gray-800 transition-all ${item.embarcou ? "line-through text-gray-500" : ""}`}
+                        >
+                          {item.nome}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {item.faculdade}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1 ml-2">
+                      <div className="flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveItem(index, "up");
+                          }}
+                          disabled={index === 0}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-600 rounded px-2 py-1 text-xs disabled:opacity-30"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveItem(index, "down");
+                          }}
+                          disabled={index === routeList.length - 1}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-600 rounded px-2 py-1 text-xs disabled:opacity-30"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFromRoute(index);
+                        }}
+                        className="bg-red-100 hover:bg-red-200 text-red-600 rounded px-2 py-1 text-xs w-full mt-1 font-bold"
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 2. ATENÇÃO / MANUAIS */}
+          {unknownList.length > 0 && (
+            <div>
+              <h2 className="font-bold text-gray-700 mb-3 border-b-2 border-orange-500 pb-1">
+                ⚠️ Atenção / Manuais ({unknownList.length})
+              </h2>
+              <ul className="bg-white rounded-lg shadow p-3 flex flex-col gap-2">
+                {unknownList.map((nome, idx) => (
+                  <li
+                    key={idx}
+                    className="text-gray-700 font-medium text-sm flex items-center justify-between border-b pb-2 last:border-0 last:pb-0"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                      {nome}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => promoteToRoute(idx)}
+                        className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold hover:bg-green-200"
+                      >
+                        + Rota
+                      </button>
+                      <button
+                        onClick={() => removeUnknown(idx)}
+                        className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold hover:bg-red-200"
+                      >
+                        X
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 3. SÓ RETORNO */}
+          {returnOnlyList.length > 0 && (
+            <div>
+              <h2 className="font-bold text-gray-700 mb-3 border-b-2 border-green-500 pb-1">
+                🔄 Só Retorno ({returnOnlyList.length})
+              </h2>
+              <ul className="bg-white rounded-lg shadow p-3 flex flex-col gap-2">
+                {returnOnlyList.map((nome, idx) => (
+                  <li
+                    key={idx}
+                    className="text-gray-700 font-medium text-sm flex items-center gap-2"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    {nome}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
