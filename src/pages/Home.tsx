@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import type { ChamadaItem } from "../types/chamada";
 import type { Student } from "../types/student";
+import { buscarMemoriaFaculdade } from "../types/chamadaStorage";
+import { salvarChamada } from "../types/chamadaStorage";
+import { useNavigate } from "react-router-dom";
 
 function Home() {
   const [textoWhatsapp, setTextoWhatsapp] = useState("");
@@ -8,6 +12,40 @@ function Home() {
   const [routeList, setRouteList] = useState<any[]>([]);
   const [unknownList, setUnknownList] = useState<string[]>([]);
   const [returnOnlyList, setReturnOnlyList] = useState<string[]>([]);
+
+  const navigate = useNavigate();
+
+  function chamadaMapper(
+    routeList: any[],
+    returnOnlyList: any[],
+  ): ChamadaItem[] {
+    const listaFinal: ChamadaItem[] = [];
+
+    routeList.forEach((route) => {
+      listaFinal.push({
+        id: route.id,
+        nome: route.nome,
+        faculdade: route.faculdade,
+        origem: "rota",
+        embarcado: false,
+      });
+    });
+
+    returnOnlyList.forEach((nome, index) => {
+      const gerarId = "retorno-" + Date.now() + "-" + index;
+      const alunoSalvo = buscarMemoriaFaculdade(nome);
+
+      listaFinal.push({
+        id: gerarId,
+        nome: nome,
+        faculdade: alunoSalvo || undefined,
+        origem: "retorno",
+        embarcado: false,
+      });
+    });
+
+    return listaFinal;
+  }
 
   const normalize = (text: string) =>
     text
@@ -17,7 +55,6 @@ function Home() {
       .trim();
 
   function preencherLista() {
-    // ATENÇÃO AMANHÃ NA VAN: Lembre de trocar o localhost:8080 pelo link do seu ngrok do Java aqui!
     axios
       .get(`http://localhost:8080/students`)
       .then((resposta) => {
@@ -26,6 +63,25 @@ function Home() {
       .catch((erro) => {
         console.error("Algo de errado aconteceu: ", erro);
       });
+  }
+
+  function copiarLista(routeList: any[]) {
+    if (!routeList || routeList.length === 0) {
+      alert("Nada para copiar.");
+      return "";
+    } else {
+      const linhas = routeList.map(
+        (student, index) => index + 1 + "-" + student.nome,
+      );
+      return linhas.join("\n");
+    }
+  }
+
+  function iniciarViagem() {
+    const listaUnificada = chamadaMapper(routeList, returnOnlyList);
+    const dataHoje = new Date().toISOString().split("T")[0];
+    salvarChamada(dataHoje, listaUnificada);
+    navigate("/chamada");
   }
 
   function processarLista() {
@@ -289,6 +345,20 @@ function Home() {
                     </div>
                   </div>
                 ))}
+                <button
+                  className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow transition cursor-pointer"
+                  onClick={() => {
+                    navigator.clipboard.writeText(copiarLista(routeList));
+                  }}
+                >
+                  Copiar Lista
+                </button>
+                <button
+                  className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition cursor-pointer"
+                  onClick={iniciarViagem}
+                >
+                  Ir para Lista de Chamada
+                </button>
               </div>
             </div>
           )}
