@@ -8,7 +8,7 @@ import GestaoFaculdades from "./pages/GestaoFaculdades";
 function App() {
   return (
     <BrowserRouter>
-      <Toaster richColors position="top-right" />;
+      <Toaster richColors position="top-right" />
       <Routes>
         <Route path="/gestaoAlunos" element={<Gestao />}></Route>
         <Route path="/chamada" element={<ListaChamada />}></Route>
