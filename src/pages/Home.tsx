@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { api } from "../services/api";
 import type { ChamadaItem } from "../types/chamada";
 import type { Student } from "../types/student";
 import { buscarMemoriaFaculdade, salvarChamada } from "../types/chamadaStorage";
@@ -68,7 +68,7 @@ function Home() {
       .trim();
 
   function preencherLista() {
-    axios
+    api
       .get(`http://localhost:8080/students`)
       .then((resposta) => {
         setAlunosBanco(resposta.data);
