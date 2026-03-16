@@ -6,11 +6,17 @@ import {
 } from "../types/chamadaStorage";
 import type { ChamadaItem } from "../types/chamada";
 import { useNavigate } from "react-router-dom";
+import { api } from "../services/api";
+import type { Faculdade } from "../types/faculdade";
 
 function ListaChamada() {
   const navigate = useNavigate();
   const [items, setItems] = useState<ChamadaItem[]>([]);
   const [currentCarousels, setCurrentCarousels] = useState<string[]>([]);
+  const [editandoAlunoId, setEditandoAlunoId] = useState<
+    number | string | null
+  >(null);
+  const [listaFaculdades, setListaFaculdades] = useState<Faculdade[]>([]);
 
   const carouselRef = useRef<HTMLDivElement>(null);
   const dataHoje = new Date().toISOString().split("T")[0];
@@ -21,11 +27,18 @@ function ListaChamada() {
   }, []);
 
   useEffect(() => {
+    api
+      .get("/faculdades")
+      .then((resposta) => setListaFaculdades(resposta.data))
+      .catch((erro) => console.error("Erro ao buscar faculdades:", erro));
+  }, []);
+
+  useEffect(() => {
     const faculdades = new Set<string>();
     let semFaculdade = false;
 
     items.forEach((item) => {
-      if (item.faculdade) {
+      if (item.faculdade && item.faculdade !== "Adicionado Manualmente") {
         faculdades.add(item.faculdade);
       } else {
         semFaculdade = true;
@@ -80,6 +93,15 @@ function ListaChamada() {
     }
   };
 
+  function excluirAluno(idDoAluno: number | string) {
+    let confirm = window.confirm("Deseja excluir esse aluno?");
+    if (confirm) {
+      const novaLista = items.filter((item) => item.id !== idDoAluno);
+      setItems(novaLista);
+      salvarChamada(dataHoje, novaLista);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* CABEÇALHO */}
@@ -108,7 +130,6 @@ function ListaChamada() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col relative w-full max-w-md mx-auto mt-4">
-          {/* NAVEGAÇÃO DO CARROSSEL */}
           <div className="flex justify-between items-center px-4 mb-2">
             <button
               onClick={() => rolarCarrossel("esquerda")}
@@ -127,7 +148,6 @@ function ListaChamada() {
             </button>
           </div>
 
-          {/* SLIDES */}
           <div
             ref={carouselRef}
             className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth pb-8 [&::-webkit-scrollbar]:hidden"
@@ -137,7 +157,9 @@ function ListaChamada() {
               const alunosDestaFaculdade = items.filter(
                 (item) =>
                   item.faculdade === faculdadeNome ||
-                  (!item.faculdade && faculdadeNome === "Sem Faculdade"),
+                  ((!item.faculdade ||
+                    item.faculdade === "Adicionado Manualmente") &&
+                    faculdadeNome === "Sem Faculdade"),
               );
 
               return (
@@ -161,7 +183,6 @@ function ListaChamada() {
                           key={aluno.id}
                           className={`flex flex-col gap-3 p-3 rounded-lg border transition-all ${aluno.embarcado ? "bg-green-50 border-green-200 opacity-70" : "bg-white border-gray-200"}`}
                         >
-                          {/* LINHA 1: Dados e Check-in */}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <span className="text-gray-400 font-bold text-sm w-5">
@@ -178,6 +199,14 @@ function ListaChamada() {
                                 >
                                   {aluno.origem}
                                 </span>
+                                <button
+                                  onClick={() => setEditandoAlunoId(aluno.id)}
+                                >
+                                  Editar
+                                </button>
+                                <button onClick={() => excluirAluno(aluno.id)}>
+                                  Deletar
+                                </button>
                               </div>
                             </div>
                             <button
@@ -188,40 +217,43 @@ function ListaChamada() {
                             </button>
                           </div>
 
-                          {/* LINHA 2: Dropdown de Atribuição (Só aparece nos manuais e sem faculdade) */}
                           {(faculdadeNome === "Sem Faculdade" ||
-                            faculdadeNome === "Adicionado Manualmente") && (
-                            <div className="ml-8 mr-14">
-                              <input
-                                type="text"
-                                list="sugestoes-faculdade"
-                                placeholder="Digite ou escolha a faculdade..."
-                                className="w-full text-sm bg-gray-50 border border-gray-300 text-gray-700 rounded-md p-2 outline-none focus:ring-2 focus:ring-blue-400"
-                                onBlur={(e) => {
-                                  // Quando o usuário sair do campo de texto, a mágica acontece
-                                  const valorDigitado = e.target.value.trim();
-                                  if (valorDigitado) {
+                            faculdadeNome === "Adicionado Manualmente" ||
+                            editandoAlunoId === aluno.id) && (
+                            <div className="ml-8 mr-14 flex flex-col gap-2">
+                              <select
+                                className="w-full text-sm border border-gray-300 text-gray-700 rounded-md p-2 outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                                defaultValue=""
+                                onChange={(e) => {
+                                  const valorSelecionado = e.target.value;
+                                  if (valorSelecionado) {
                                     atribuirFaculdade(
                                       aluno.id,
                                       aluno.nome,
-                                      valorDigitado,
+                                      valorSelecionado,
                                     );
+                                    setEditandoAlunoId(null);
                                   }
                                 }}
-                              />
-                              <datalist id="sugestoes-faculdade">
-                                {currentCarousels
-                                  .filter(
-                                    (f) =>
-                                      f !== "Sem Faculdade" &&
-                                      f !== "Adicionado Manualmente",
-                                  )
-                                  .map((opcaoFaculdade, i) => (
-                                    <option key={i} value={opcaoFaculdade}>
-                                      {opcaoFaculdade}
-                                    </option>
-                                  ))}
-                              </datalist>
+                              >
+                                <option value="" disabled>
+                                  Selecione a faculdade...
+                                </option>
+                                {listaFaculdades.map((f) => (
+                                  <option key={f.id} value={f.nome}>
+                                    {f.nome}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {editandoAlunoId === aluno.id && (
+                                <button
+                                  onClick={() => setEditandoAlunoId(null)}
+                                  className="text-xs text-red-500 font-bold self-start cursor-pointer hover:underline"
+                                >
+                                  Cancelar edição
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -231,6 +263,57 @@ function ListaChamada() {
                 </div>
               );
             })}
+          </div>
+          {/* LISTA GERAL (SOMENTE LEITURA) */}
+          <div className="mt-1 px-4 pb-8">
+            {/* Cabeçalho com Contador */}
+            <div className="flex items-center justify-between border-b-2 border-gray-300 pb-2 mb-4">
+              <h2 className="text-xl font-bold text-gray-800">Visão Geral</h2>
+              <span className="text-sm font-black bg-blue-100 text-blue-800 px-3 py-1 rounded-full shadow-sm">
+                {items.filter((i) => i.embarcado).length} / {items.length}{" "}
+                Embarcados
+              </span>
+            </div>
+
+            {/* Lista Corrida */}
+            <div className="flex flex-col gap-2">
+              {items.map((aluno, index) => (
+                <div
+                  key={`geral-${aluno.id}`}
+                  className={`flex items-center justify-between p-3 rounded-lg border-l-4 shadow-sm transition-all ${
+                    aluno.embarcado
+                      ? "bg-green-50 border-green-500 opacity-60"
+                      : "bg-white border-yellow-400"
+                  }`}
+                >
+                  {/* Info do Aluno */}
+                  <div>
+                    <p
+                      className={`font-bold text-sm ${aluno.embarcado ? "line-through text-gray-500" : "text-gray-800"}`}
+                    >
+                      {index + 1}. {aluno.nome}
+                    </p>
+                    <p className="text-xs text-gray-500 font-semibold mt-0.5">
+                      {aluno.faculdade || "Sem Faculdade"} •{" "}
+                      <span className="uppercase">{aluno.origem}</span>
+                    </p>
+                  </div>
+
+                  {/* Badges de Status (Sem botão clicável) */}
+                  <div>
+                    {aluno.embarcado ? (
+                      <span className="bg-green-500 text-white text-[10px] uppercase font-bold px-2 py-1 rounded">
+                        Presente
+                      </span>
+                    ) : (
+                      <span className="bg-yellow-500 text-white text-[10px] uppercase font-bold px-2 py-1 rounded animate-pulse">
+                        Aguardando
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

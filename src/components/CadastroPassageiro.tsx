@@ -1,6 +1,7 @@
-import { useState } from "react";
-import axios from "axios";
+import { useEffect, useState } from "react";
+import { api } from "../services/api";
 import type { Student } from "../types/student";
+import type { Faculdade } from "../types/faculdade";
 
 interface CadastroProps {
   aoVoltar: () => void;
@@ -18,13 +19,33 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
   const [bairro, setBairro] = useState(
     alunoEditando ? alunoEditando.bairro : "",
   );
-  const [faculdade, setFaculdade] = useState(
-    alunoEditando ? alunoEditando.faculdade : "",
-  );
+
+  const [listaFaculdades, setListaFaculdades] = useState<Faculdade[]>([]);
+  const [faculdadeId, setFaculdadeId] = useState<string>("");
+
   const [turno, setTurno] = useState(
     alunoEditando ? alunoEditando.turno : "MANHA",
   );
   const [ordemRota, setOrdemRota] = useState(alunoEditando?.ordemRota || "");
+
+  useEffect(() => {
+    api
+      .get("/faculdades")
+      .then((resposta) => {
+        const faculdadesDoBanco = resposta.data;
+        setListaFaculdades(faculdadesDoBanco);
+
+        if (alunoEditando && alunoEditando.faculdade) {
+          const faculdadeEncontrada = faculdadesDoBanco.find(
+            (f: Faculdade) => f.nome === alunoEditando.faculdade,
+          );
+          if (faculdadeEncontrada) {
+            setFaculdadeId(faculdadeEncontrada.id.toString());
+          }
+        }
+      })
+      .catch((erro) => console.error("Erro ao buscar faculdades:", erro));
+  }, [alunoEditando]);
 
   function salvarPassageiro() {
     const dadosPassageiro = {
@@ -32,21 +53,21 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
       telefone,
       endereco,
       bairro,
-      faculdade,
+      faculdade: faculdadeId ? { id: Number(faculdadeId) } : null,
       turno,
       ordemRota: Number(ordemRota),
     };
+
     if (alunoEditando) {
-      axios
-        .put(
-          `http://localhost:8080/students/${alunoEditando.id}`,
-          dadosPassageiro,
-        )
-        .then(() => aoVoltar());
+      api
+        .put(`/students/${alunoEditando.id}`, dadosPassageiro)
+        .then(() => aoVoltar())
+        .catch((erro) => console.error("Erro ao editar:", erro));
     } else {
-      axios
-        .post("http://localhost:8080/students", dadosPassageiro)
-        .then(() => aoVoltar());
+      api
+        .post("/students", dadosPassageiro)
+        .then(() => aoVoltar())
+        .catch((erro) => console.error("Erro ao salvar:", erro));
     }
   }
 
@@ -114,12 +135,20 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Faculdade
           </label>
-          <input
-            type="text"
-            className="w-full p-2 rounded-lg border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
-            value={faculdade}
-            onChange={(e) => setFaculdade(e.target.value)}
-          ></input>
+          <select
+            className="w-full p-2 rounded-lg border border-gray-300 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+            value={faculdadeId}
+            onChange={(e) => setFaculdadeId(e.target.value)}
+          >
+            <option value="" disabled>
+              Selecione uma faculdade...
+            </option>
+            {listaFaculdades.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.nome}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -140,7 +169,7 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
             Turno
           </label>
           <select
-            className="w-full p-2 rounded-lg border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+            className="w-full p-2 rounded-lg border border-gray-300 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
             value={turno}
             onChange={(e) => setTurno(e.target.value)}
           >

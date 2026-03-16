@@ -1,4 +1,4 @@
-import axios from "axios";
+import { api } from "../services/api";
 import type { Student } from "../types/student.ts";
 import { useEffect, useState } from "react";
 import CadastroPassageiro from "../components/CadastroPassageiro.tsx";
@@ -11,8 +11,8 @@ function Gestao() {
 
   function buscarAlunos() {
     if (busca === "") {
-      axios
-        .get("http://localhost:8080/students")
+      api
+        .get("/students")
         .then((resposta) => {
           setStudents(resposta.data);
         })
@@ -20,8 +20,8 @@ function Gestao() {
           console.error("Algo de errado aconteceu: ", erro);
         });
     } else {
-      axios
-        .get(`http://localhost:8080/students/search?nome=${busca}`)
+      api
+        .get(`/students/search?nome=${busca}`)
         .then((resposta) => {
           setStudents(resposta.data);
         })
@@ -36,8 +36,8 @@ function Gestao() {
   }, [busca]);
 
   function deletarAluno(id: number) {
-    axios
-      .delete(`http://localhost:8080/students/${id}`)
+    api
+      .delete(`/students/${id}`)
       .then(() => {
         setStudents(students.filter((student) => student.id !== id));
       })
