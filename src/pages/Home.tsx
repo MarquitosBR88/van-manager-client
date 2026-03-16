@@ -2,9 +2,22 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import type { ChamadaItem } from "../types/chamada";
 import type { Student } from "../types/student";
-import { buscarMemoriaFaculdade } from "../types/chamadaStorage";
-import { salvarChamada } from "../types/chamadaStorage";
+import { buscarMemoriaFaculdade, salvarChamada } from "../types/chamadaStorage";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import {
+  Bus,
+  ClipboardPaste,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  Copy,
+  AlertTriangle,
+  RefreshCcw,
+  Users,
+  Building,
+  Play,
+} from "lucide-react";
 
 function Home() {
   const [textoWhatsapp, setTextoWhatsapp] = useState("");
@@ -60,32 +73,43 @@ function Home() {
       .then((resposta) => {
         setAlunosBanco(resposta.data);
       })
-      .catch((erro) => {
-        console.error("Algo de errado aconteceu: ", erro);
+      .catch(() => {
+        toast.error(
+          "Erro ao conectar com o servidor. Verifique se o back-end está rodando.",
+        );
       });
   }
 
   function copiarLista(routeList: any[]) {
     if (!routeList || routeList.length === 0) {
-      alert("Nada para copiar.");
+      toast.warning("Não há nada na rota para copiar.");
       return "";
     } else {
       const linhas = routeList.map(
-        (student, index) => index + 1 + "-" + student.nome,
+        (student, index) => `${index + 1} - ${student.nome}`,
       );
+      toast.success("Lista copiada para a área de transferência!");
       return linhas.join("\n");
     }
   }
 
   function iniciarViagem() {
+    if (routeList.length === 0 && returnOnlyList.length === 0) {
+      toast.error("Gere uma rota antes de iniciar a viagem.");
+      return;
+    }
     const listaUnificada = chamadaMapper(routeList, returnOnlyList);
     const dataHoje = new Date().toISOString().split("T")[0];
     salvarChamada(dataHoje, listaUnificada);
+    toast.success("Viagem iniciada com sucesso!");
     navigate("/chamada");
   }
 
   function processarLista() {
-    if (!textoWhatsapp.trim()) return;
+    if (!textoWhatsapp.trim()) {
+      toast.warning("Cole a lista do WhatsApp primeiro.");
+      return;
+    }
 
     const currentRoute: any[] = [];
     const currentUnknown: string[] = [];
@@ -117,13 +141,11 @@ function Home() {
         }
       }
 
-      // Se requer atenção (tem parênteses estranhos), vai pra lista de baixo para análise manual
       if (isAttention) {
         currentUnknown.push(cleanLine);
         return;
       }
 
-      // 1. Acha TODOS os candidatos que combinam
       let candidatos = alunosBanco.filter((aluno) => {
         if (!aluno.nome) return false;
         const nDb = normalize(aluno.nome);
@@ -137,17 +159,13 @@ function Home() {
       let matchedStudent = undefined;
 
       if (candidatos.length > 0) {
-        // 2. O Desempate: quem é o aluno certo?
         candidatos.sort((a, b) => {
           const nA = normalize(a.nome);
           const nB = normalize(b.nome);
 
-          // Regra 1: Match 100% perfeito ganha de todo mundo
           if (nA === normalizedLine) return -1;
           if (nB === normalizedLine) return 1;
 
-          // Regra 2: O cara colou "Maria Eduarda Silva (so volta)"
-          // Se achou as duas Marias dentro do texto, a MAIOR (que engloba o Silva) tem prioridade
           const aEstaNaLinha = normalizedLine.includes(nA);
           const bEstaNaLinha = normalizedLine.includes(nB);
 
@@ -155,12 +173,9 @@ function Home() {
           if (aEstaNaLinha) return -1;
           if (bEstaNaLinha) return 1;
 
-          // Regra 3: O cara colou só "Maria Eduarda"
-          // O banco achou as duas. A MENOR tem prioridade, pra Silva não entrar no lugar dela.
           return nA.length - nB.length;
         });
 
-        // O verdadeiro campeão senta na cadeira
         matchedStudent = candidatos[0];
       }
 
@@ -177,7 +192,7 @@ function Home() {
             nome: matchedStudent.nome,
             faculdade: matchedStudent.faculdade,
             originalIndex: matchedStudent.ordemRota,
-            embarcou: false, // <-- Adicionado para o Check-in não falhar
+            embarcou: false,
           });
           processedIds.add(matchedStudent.id);
         }
@@ -199,6 +214,7 @@ function Home() {
     setRouteList(currentRoute);
     setUnknownList(currentUnknown);
     setReturnOnlyList(currentReturn);
+    toast.success("Lista processada com sucesso!");
   }
 
   const removeFromRoute = (index: number) => {
@@ -249,17 +265,37 @@ function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:max-w-md md:mx-auto flex flex-col gap-6">
-      <h1 className="text-2xl font-bold text-gray-800 text-center mt-4">
-        Roteiro do Dia
-      </h1>
+    <div className="min-h-screen bg-gray-50 p-4 md:max-w-md md:mx-auto flex flex-col gap-6 font-sans">
+      {/* HEADER & ATALHOS */}
+      <div className="flex flex-col gap-4 mt-4">
+        <div className="flex items-center justify-center gap-2 text-blue-700">
+          <Bus size={32} strokeWidth={2.5} />
+          <h1 className="text-3xl font-black tracking-tight">MinhaRota</h1>
+        </div>
 
-      <div className="bg-white p-4 rounded-xl shadow-md">
-        <label className="block text-sm font-bold text-gray-700 mb-2">
-          Cole a lista do WhatsApp aqui:
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => navigate("/gestaoAlunos")}
+            className="flex items-center justify-center gap-2 bg-white border border-gray-200 p-3 rounded-xl shadow-sm hover:bg-gray-50 transition text-gray-700 font-semibold text-sm"
+          >
+            <Users size={18} className="text-blue-500" /> Alunos
+          </button>
+          <button
+            onClick={() => navigate("/gestaoFaculdades")}
+            className="flex items-center justify-center gap-2 bg-white border border-gray-200 p-3 rounded-xl shadow-sm hover:bg-gray-50 transition text-gray-700 font-semibold text-sm"
+          >
+            <Building size={18} className="text-purple-500" /> Faculdades
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+        <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
+          <ClipboardPaste size={18} className="text-gray-400" />
+          Cole a lista do WhatsApp:
         </label>
         <textarea
-          className="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+          className="w-full h-40 p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none resize-none transition"
           placeholder="Ex:&#10;1. Joãozinho&#10;2. Maria&#10;3. Pedrinho"
           value={textoWhatsapp}
           onChange={(e) => setTextoWhatsapp(e.target.value)}
@@ -267,44 +303,51 @@ function Home() {
 
         <button
           onClick={processarLista}
-          className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition cursor-pointer"
+          className="w-full flex justify-center items-center gap-2 mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-[0.98]"
         >
-          Gerar Rota
+          <RefreshCcw size={20} />
+          Gerar Rota do Dia
         </button>
       </div>
 
       {(routeList.length > 0 ||
         unknownList.length > 0 ||
         returnOnlyList.length > 0) && (
-        <div className="flex flex-col gap-4 mb-8">
+        <div className="flex flex-col gap-6 mb-8">
           {/* 1. LISTA PRINCIPAL */}
           {routeList.length > 0 && (
-            <div>
-              <h2 className="font-bold text-gray-700 mb-3 border-b-2 border-blue-500 pb-1">
-                🚌 Rota Principal ({routeList.length})
-              </h2>
-              <div className="flex flex-col gap-2">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-blue-50 p-4 border-b border-blue-100 flex items-center justify-between">
+                <h2 className="font-bold text-blue-800 flex items-center gap-2">
+                  <Bus size={20} /> Rota Principal
+                </h2>
+                <span className="bg-blue-200 text-blue-800 text-xs font-black px-2 py-1 rounded-full">
+                  {routeList.length}
+                </span>
+              </div>
+
+              <div className="flex flex-col p-2 gap-2">
                 {routeList.map((item, index) => (
                   <div
                     key={item.id || index}
-                    className={`p-3 rounded-lg shadow border-l-4 flex justify-between items-center transition-colors duration-300 ${item.embarcou ? "bg-green-100 border-green-500 opacity-75" : "bg-white border-blue-500"}`}
+                    className={`p-3 rounded-xl border flex justify-between items-center transition-all duration-300 ${item.embarcou ? "bg-green-50 border-green-200 opacity-60" : "bg-white border-gray-200 shadow-sm"}`}
                   >
                     <div
                       className="flex items-center gap-3 flex-1 cursor-pointer"
                       onClick={() => toggleEmbarque(index)}
                     >
                       <button
-                        className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-lg shadow-sm transition-colors ${item.embarcou ? "bg-green-500 text-white" : "bg-blue-100 text-blue-700"}`}
+                        className={`w-10 h-10 flex items-center justify-center rounded-full font-bold text-sm transition-colors ${item.embarcou ? "bg-green-500 text-white shadow-inner" : "bg-blue-50 text-blue-600 border border-blue-100"}`}
                       >
                         {item.embarcou ? "✓" : index + 1}
                       </button>
                       <div>
                         <p
-                          className={`font-bold text-gray-800 transition-all ${item.embarcou ? "line-through text-gray-500" : ""}`}
+                          className={`font-bold text-gray-800 transition-all ${item.embarcou ? "line-through text-gray-400" : ""}`}
                         >
                           {item.nome}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mt-0.5">
                           {item.faculdade}
                         </p>
                       </div>
@@ -318,9 +361,9 @@ function Home() {
                             moveItem(index, "up");
                           }}
                           disabled={index === 0}
-                          className="bg-gray-100 hover:bg-gray-200 text-gray-600 rounded px-2 py-1 text-xs disabled:opacity-30"
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg p-1.5 disabled:opacity-30 transition"
                         >
-                          ▲
+                          <ArrowUp size={16} strokeWidth={3} />
                         </button>
                         <button
                           onClick={(e) => {
@@ -328,9 +371,9 @@ function Home() {
                             moveItem(index, "down");
                           }}
                           disabled={index === routeList.length - 1}
-                          className="bg-gray-100 hover:bg-gray-200 text-gray-600 rounded px-2 py-1 text-xs disabled:opacity-30"
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg p-1.5 disabled:opacity-30 transition"
                         >
-                          ▼
+                          <ArrowDown size={16} strokeWidth={3} />
                         </button>
                       </div>
                       <button
@@ -338,59 +381,67 @@ function Home() {
                           e.stopPropagation();
                           removeFromRoute(index);
                         }}
-                        className="bg-red-100 hover:bg-red-200 text-red-600 rounded px-2 py-1 text-xs w-full mt-1 font-bold"
+                        className="bg-red-50 hover:bg-red-100 text-red-500 rounded-lg p-1.5 flex items-center justify-center transition mt-1"
                       >
-                        Excluir
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
                 ))}
-                <button
-                  className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow transition cursor-pointer"
-                  onClick={() => {
-                    navigator.clipboard.writeText(copiarLista(routeList));
-                  }}
-                >
-                  Copiar Lista
-                </button>
-                <button
-                  className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition cursor-pointer"
-                  onClick={iniciarViagem}
-                >
-                  Ir para Lista de Chamada
-                </button>
+
+                <div className="grid grid-cols-1 gap-2 mt-2 px-1">
+                  <button
+                    className="flex justify-center items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-[0.98]"
+                    onClick={() =>
+                      navigator.clipboard.writeText(copiarLista(routeList))
+                    }
+                  >
+                    <Copy size={18} /> Copiar Lista
+                  </button>
+                  <button
+                    className="flex justify-center items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-[0.98]"
+                    onClick={iniciarViagem}
+                  >
+                    <Play size={18} className="fill-white" /> Iniciar Chamada
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
           {/* 2. ATENÇÃO / MANUAIS */}
           {unknownList.length > 0 && (
-            <div>
-              <h2 className="font-bold text-gray-700 mb-3 border-b-2 border-orange-500 pb-1">
-                ⚠️ Atenção / Manuais ({unknownList.length})
-              </h2>
-              <ul className="bg-white rounded-lg shadow p-3 flex flex-col gap-2">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-orange-50 p-4 border-b border-orange-100 flex items-center justify-between">
+                <h2 className="font-bold text-orange-800 flex items-center gap-2">
+                  <AlertTriangle size={20} /> Revisão Manual
+                </h2>
+                <span className="bg-orange-200 text-orange-800 text-xs font-black px-2 py-1 rounded-full">
+                  {unknownList.length}
+                </span>
+              </div>
+              <ul className="flex flex-col p-2 gap-1">
                 {unknownList.map((nome, idx) => (
                   <li
                     key={idx}
-                    className="text-gray-700 font-medium text-sm flex items-center justify-between border-b pb-2 last:border-0 last:pb-0"
+                    className="flex items-center justify-between p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded-lg transition"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                    <div className="flex items-center gap-3 text-gray-700 font-semibold text-sm">
+                      <div className="w-2 h-2 rounded-full bg-orange-400"></div>
                       {nome}
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => promoteToRoute(idx)}
-                        className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold hover:bg-green-200"
+                        className="bg-green-50 text-green-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-100 transition"
                       >
-                        + Rota
+                        + Adicionar
                       </button>
                       <button
                         onClick={() => removeUnknown(idx)}
-                        className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold hover:bg-red-200"
+                        className="bg-red-50 text-red-500 p-1.5 rounded-lg hover:bg-red-100 transition"
                       >
-                        X
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </li>
@@ -401,17 +452,22 @@ function Home() {
 
           {/* 3. SÓ RETORNO */}
           {returnOnlyList.length > 0 && (
-            <div>
-              <h2 className="font-bold text-gray-700 mb-3 border-b-2 border-green-500 pb-1">
-                🔄 Só Retorno ({returnOnlyList.length})
-              </h2>
-              <ul className="bg-white rounded-lg shadow p-3 flex flex-col gap-2">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-emerald-50 p-4 border-b border-emerald-100 flex items-center justify-between">
+                <h2 className="font-bold text-emerald-800 flex items-center gap-2">
+                  <RefreshCcw size={20} /> Somente Retorno
+                </h2>
+                <span className="bg-emerald-200 text-emerald-800 text-xs font-black px-2 py-1 rounded-full">
+                  {returnOnlyList.length}
+                </span>
+              </div>
+              <ul className="flex flex-col p-2 gap-1">
                 {returnOnlyList.map((nome, idx) => (
                   <li
                     key={idx}
-                    className="text-gray-700 font-medium text-sm flex items-center gap-2"
+                    className="flex items-center gap-3 p-3 text-gray-700 font-semibold text-sm border-b border-gray-100 last:border-0"
                   >
-                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
                     {nome}
                   </li>
                 ))}

@@ -2,6 +2,17 @@ import { useEffect, useState } from "react";
 import { api } from "../services/api";
 import type { Student } from "../types/student";
 import type { Faculdade } from "../types/faculdade";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  User,
+  Phone,
+  MapPin,
+  Building,
+  Hash,
+  Clock,
+  Save,
+} from "lucide-react";
 
 interface CadastroProps {
   aoVoltar: () => void;
@@ -22,11 +33,11 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
 
   const [listaFaculdades, setListaFaculdades] = useState<Faculdade[]>([]);
   const [faculdadeId, setFaculdadeId] = useState<string>("");
-
   const [turno, setTurno] = useState(
     alunoEditando ? alunoEditando.turno : "MANHA",
   );
   const [ordemRota, setOrdemRota] = useState(alunoEditando?.ordemRota || "");
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     api
@@ -39,15 +50,20 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
           const faculdadeEncontrada = faculdadesDoBanco.find(
             (f: Faculdade) => f.nome === alunoEditando.faculdade,
           );
-          if (faculdadeEncontrada) {
+          if (faculdadeEncontrada)
             setFaculdadeId(faculdadeEncontrada.id.toString());
-          }
         }
       })
-      .catch((erro) => console.error("Erro ao buscar faculdades:", erro));
+      .catch(() => toast.error("Erro ao carregar a lista de faculdades."));
   }, [alunoEditando]);
 
   function salvarPassageiro() {
+    if (!nome.trim()) {
+      toast.warning("O nome do passageiro é obrigatório.");
+      return;
+    }
+
+    setSalvando(true);
     const dadosPassageiro = {
       nome,
       telefone,
@@ -58,132 +74,149 @@ function CadastroPassageiro({ aoVoltar, alunoEditando }: CadastroProps) {
       ordemRota: Number(ordemRota),
     };
 
-    if (alunoEditando) {
-      api
-        .put(`/students/${alunoEditando.id}`, dadosPassageiro)
-        .then(() => aoVoltar())
-        .catch((erro) => console.error("Erro ao editar:", erro));
-    } else {
-      api
-        .post("/students", dadosPassageiro)
-        .then(() => aoVoltar())
-        .catch((erro) => console.error("Erro ao salvar:", erro));
-    }
+    const requisicao = alunoEditando
+      ? api.put(`/students/${alunoEditando.id}`, dadosPassageiro)
+      : api.post("/students", dadosPassageiro);
+
+    requisicao
+      .then(() => {
+        toast.success(
+          `Passageiro ${alunoEditando ? "editado" : "salvo"} com sucesso!`,
+        );
+        aoVoltar();
+      })
+      .catch(() => {
+        toast.error("Erro ao salvar os dados.");
+        setSalvando(false);
+      });
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:max-w-md md:mx-auto">
+    <div className="font-sans animate-in fade-in slide-in-from-bottom-4 duration-300">
       <button
-        className="text-blue-600 font-semibold mb-4 hover:underline cursor-pointer"
+        className="flex items-center gap-2 text-gray-500 font-bold mb-6 hover:text-gray-800 transition"
         onClick={aoVoltar}
       >
-        ← Voltar para Lista
+        <ArrowLeft size={20} /> Voltar
       </button>
-      <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-        {alunoEditando ? "Editar Passageiro" : "Novo Passageiro"}
-      </h2>
-      <div className="bg-white p-6 rounded-xl shadow-md flex flex-col gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Nome Completo
-          </label>
-          <input
-            type="text"
-            className="w-full p-2 rounded-lg border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-          ></input>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Telefone
-          </label>
-          <input
-            type="number"
-            className="w-full p-2 rounded-lg border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
-            value={telefone}
-            onChange={(e) => setTelefone(e.target.value)}
-          ></input>
-        </div>
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-5">
+        <h2 className="text-xl font-black text-gray-800 border-b border-gray-100 pb-4">
+          {alunoEditando ? "Editar Passageiro" : "Novo Passageiro"}
+        </h2>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Endereço
-          </label>
-          <input
-            type="text"
-            className="w-full p-2 rounded-lg border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
-            value={endereco}
-            onChange={(e) => setEndereco(e.target.value)}
-          ></input>
-        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-1.5">
+              <User size={16} className="text-blue-500" /> Nome Completo
+            </label>
+            <input
+              type="text"
+              className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Bairro
-          </label>
-          <input
-            type="text"
-            className="w-full p-2 rounded-lg border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
-            value={bairro}
-            onChange={(e) => setBairro(e.target.value)}
-          ></input>
-        </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-1.5">
+              <Phone size={16} className="text-green-500" /> Telefone
+            </label>
+            <input
+              type="number"
+              className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Faculdade
-          </label>
-          <select
-            className="w-full p-2 rounded-lg border border-gray-300 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
-            value={faculdadeId}
-            onChange={(e) => setFaculdadeId(e.target.value)}
-          >
-            <option value="" disabled>
-              Selecione uma faculdade...
-            </option>
-            {listaFaculdades.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.nome}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-1.5">
+                <MapPin size={16} className="text-red-500" /> Endereço
+              </label>
+              <input
+                type="text"
+                className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                value={endereco}
+                onChange={(e) => setEndereco(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-1.5">
+                Bairro
+              </label>
+              <input
+                type="text"
+                className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                value={bairro}
+                onChange={(e) => setBairro(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-1.5">
+              <Building size={16} className="text-purple-500" /> Faculdade
+            </label>
+            <select
+              className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+              value={faculdadeId}
+              onChange={(e) => setFaculdadeId(e.target.value)}
+            >
+              <option value="" disabled>
+                Selecione uma faculdade...
               </option>
-            ))}
-          </select>
-        </div>
+              {listaFaculdades.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nome}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ordem no Roteiro (Posição)
-          </label>
-          <input
-            type="number"
-            placeholder="Ex: 1 (Primeiro a ser buscado)"
-            className="w-full p-2 rounded-lg border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
-            value={ordemRota}
-            onChange={(e) => setOrdemRota(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Turno
-          </label>
-          <select
-            className="w-full p-2 rounded-lg border border-gray-300 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
-            value={turno}
-            onChange={(e) => setTurno(e.target.value)}
-          >
-            <option value="MANHA">Manhã</option>
-            <option value="TARDE">Tarde</option>
-            <option value="NOITE">Noite</option>
-          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-1.5">
+                <Hash size={16} className="text-gray-400" /> Posição
+              </label>
+              <input
+                type="number"
+                placeholder="Ex: 1"
+                className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                value={ordemRota}
+                onChange={(e) => setOrdemRota(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-1.5">
+                <Clock size={16} className="text-orange-500" /> Turno
+              </label>
+              <select
+                className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                value={turno}
+                onChange={(e) => setTurno(e.target.value)}
+              >
+                <option value="MANHA">Manhã</option>
+                <option value="TARDE">Tarde</option>
+                <option value="NOITE">Noite</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <button
-          className="w-full bg-green-600 text-white font-bold text-lg py-4 rounded-lg mt-4 shadow-md hover:bg-green-700 transition cursor-pointer"
+          disabled={salvando}
+          className="w-full flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg py-4 rounded-xl mt-2 shadow-md transition active:scale-[0.98] disabled:opacity-70"
           onClick={salvarPassageiro}
         >
-          Salvar Passageiro
+          {salvando ? (
+            "Salvando..."
+          ) : (
+            <>
+              <Save size={20} /> Salvar Passageiro
+            </>
+          )}
         </button>
       </div>
     </div>
