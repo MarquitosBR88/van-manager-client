@@ -69,7 +69,7 @@ function Home() {
 
   function preencherLista() {
     api
-      .get(`http://localhost:8080/students`)
+      .get(`/students`)
       .then((resposta) => {
         setAlunosBanco(resposta.data);
       })
