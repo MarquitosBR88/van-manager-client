@@ -1,73 +1,40 @@
-# React + TypeScript + Vite
+# 🚐 MinhaRota - Sistema de Gestão de Passageiros
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+O **MinhaRota** é uma aplicação Fullstack desenvolvida para resolver um problema real de logística diária: a gestão de listas de passageiros em vans de transporte universitário, transformando mensagens despadronizadas do WhatsApp em rotas otimizadas e interativas.
 
-Currently, two official plugins are available:
+🔗 **[Acessar a Aplicação em Produção](https://minharota-eta.vercel.app/)**
+*(Nota: O back-end está hospedado no tier gratuito do Render. O primeiro carregamento pode levar ~50 segundos para despertar o servidor).*
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+*👉 O código-fonte da API em Spring Boot (Back-end) está [neste repositório](https://github.com/MarquitosBR88/van-connect-backend).*
 
-## React Compiler
+## O Problema Resolvido
+Motoristas recebiam listas caóticas diariamente via WhatsApp, com alunos usando apelidos, errando nomes de faculdades e solicitando viagens "só de ida" ou "só de volta". O controle era manual, propenso a falhas, e fora de ordem, o que exigia conferência manual atrasando a rota.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## A Solução (Features)
+* **Parser Inteligente:** Motor de text-processing que lê a string do WhatsApp, limpa ruídos (como números e caracteres especiais), resolve identidades e classifica os passageiros em "Rota Principal", "Revisão Manual" ou "Somente Retorno".
+* **Single Source of Truth (SSOT):** Tela de chamada em tempo real. O estado do aplicativo é sincronizado instantaneamente entre o Carrossel interativo e a Visão Geral de controle.
+* **CRUD Completo:** Gestão relacional de Alunos e Faculdades.
+* **UX/UI Corporativa:** Feedback visual instantâneo com Toasts, proteção contra cliques duplos e navegação fluida construída com Tailwind CSS.
 
-## Expanding the ESLint configuration
+## Arquitetura e Tecnologias
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**Front-end (Client-side):**
+* **React + Vite:** Alta performance e tempo de build otimizado.
+* **TypeScript:** Tipagem estática para maior previsibilidade e redução de bugs.
+* **Tailwind CSS v4 + Lucide React:** Design System responsivo, limpo e padronizado.
+* **Axios & Sonner:** Comunicação HTTP robusta e tratamento de exceções amigável.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**Back-end (API REST):**
+* **Java 25 + Spring Boot:** Arquitetura sólida e escalável em sua versão LTS mais recente.
+* **Spring Data JPA / Hibernate:** Mapeamento objeto-relacional (ORM).
+* **PostgreSQL:** Banco de dados relacional em nuvem.
+* **Docker:** Contêinerização da aplicação usando a imagem `amazoncorretto:25` para deploy no Render.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Como executar localmente
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Rodando o App (Front-end)
+```bash
+cd frontend
+npm install
+npm run dev
 ```
